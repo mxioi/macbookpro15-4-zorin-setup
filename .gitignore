@@ -1,0 +1,39 @@
+# Backup files
+*.backup
+*.bak
+*~
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+/tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Downloaded firmware (large files)
+*.bin
+*.hcd
+*.clm_blob
+*.txt
+
+# Build artifacts
+*.o
+*.ko
+*.mod
+*.mod.c
+modules.order
+Module.symvers
+
+# Test recordings
+test.wav
+*.wav
