@@ -142,11 +142,14 @@ Find the line starting with `GRUB_CMDLINE_LINUX_DEFAULT=`
 Add these parameters inside the quotes:
 ```
 intel_iommu=on iommu=pt pcie_ports=compat
+
+Recommended with current t2linux audio guidance:
+intel_iommu=on iommu=pt pm_async=off pcie_ports=compat
 ```
 
 Example:
 ```
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_iommu=on iommu=pt pcie_ports=compat"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_iommu=on iommu=pt pm_async=off pcie_ports=compat"
 ```
 
 Save and exit (Ctrl+X, Y, Enter)
@@ -174,7 +177,7 @@ sudo update-grub
 dpkg -l | grep linux-image
 ```
 
-Should only show the T2 kernel (6.12.x-t2-noble)
+Should only show T2 kernel packages (`*-t2-*`)
 
 ---
 
@@ -216,7 +219,7 @@ sudo reboot
 ```bash
 # Check kernel
 uname -r
-# Should show: 6.12.x-x-t2-noble
+# Should include: -t2-
 
 # Check apple-bce
 lsmod | grep apple_bce
@@ -225,7 +228,7 @@ lsmod | grep apple_bce
 iwconfig
 
 # Check kernel parameters
-cat /proc/cmdline | grep -o "intel_iommu=on iommu=pt pcie_ports=compat"
+cat /proc/cmdline | grep -Eo "intel_iommu=on|iommu=pt|pm_async=off|pcie_ports=compat"
 ```
 
 ### Test Hardware

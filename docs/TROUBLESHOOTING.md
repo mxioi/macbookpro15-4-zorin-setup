@@ -35,7 +35,7 @@ sudo modprobe apple-bce
 uname -r
 ```
 
-Must show: `6.12.x-x-t2-noble`
+Must include: `-t2-`
 
 **If showing 6.14.x-generic:**
 - Stock Ubuntu kernel does NOT support trackpad
@@ -95,7 +95,7 @@ Should show: `Apple T2 Audio Digital Mic`
 
 **If not showing:**
 ```bash
-sudo bash scripts/04_setup_t2_audio.sh
+sudo bash scripts/fix_mic.sh
 sudo reboot
 ```
 
@@ -148,8 +148,9 @@ sudo reboot
 ```
 
 ### Set T2 kernel as default
+Use `sudo grub-set-default` with your currently installed T2 kernel menu entry.
+
 ```bash
-sudo grub-set-default "Advanced options for Ubuntu>Ubuntu, with Linux 6.12.61-1-t2-noble"
 sudo update-grub
 sudo reboot
 ```
@@ -197,6 +198,7 @@ cat /proc/cmdline
 Should include:
 - `intel_iommu=on`
 - `iommu=pt`
+- `pm_async=off`
 - `pcie_ports=compat`
 
 **If missing:**
@@ -214,7 +216,7 @@ Find line: `GRUB_CMDLINE_LINUX_DEFAULT=`
 
 Add to the end (inside quotes):
 ```
-intel_iommu=on iommu=pt pcie_ports=compat
+intel_iommu=on iommu=pt pm_async=off pcie_ports=compat
 ```
 
 Then:

@@ -19,7 +19,7 @@ if uname -r | grep -q "t2"; then
 else
     echo "  ✗ NOT running T2 kernel - trackpad won't work!"
     echo "    Current: $(uname -r)"
-    echo "    Expected: 6.12.x-x-t2-noble"
+    echo "    Expected: *-t2-* kernel"
 fi
 echo ""
 
@@ -104,7 +104,8 @@ echo ""
 
 echo "[Thunderbolt/USB-C]"
 if command -v boltctl >/dev/null 2>&1; then
-    DOMAINS=$(boltctl domains 2>/dev/null | grep -c "Domain" || echo "0")
+    DOMAINS=$(boltctl domains 2>/dev/null | grep -c "Domain" || true)
+    [ -n "$DOMAINS" ] || DOMAINS="0"
     echo "  ✓ Thunderbolt: $DOMAINS domain(s)"
 else
     echo "  ℹ Thunderbolt status unknown"
@@ -115,6 +116,7 @@ echo "[Kernel Parameters]"
 CMDLINE=$(cat /proc/cmdline)
 echo "  intel_iommu=on:  $(echo $CMDLINE | grep -q 'intel_iommu=on' && echo '✓' || echo '✗')"
 echo "  iommu=pt:        $(echo $CMDLINE | grep -q 'iommu=pt' && echo '✓' || echo '✗')"
+echo "  pm_async=off:    $(echo $CMDLINE | grep -q 'pm_async=off' && echo '✓' || echo '✗')"
 echo "  pcie_ports=compat: $(echo $CMDLINE | grep -q 'pcie_ports=compat' && echo '✓' || echo '✗')"
 echo ""
 

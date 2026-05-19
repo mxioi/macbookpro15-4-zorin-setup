@@ -47,7 +47,7 @@ sudo bash scripts/master_install.sh
 
 ## 📋 What Gets Installed
 
-### 1. T2 Kernel (6.12.x-t2)
+### 1. T2 Kernel
 - Patched kernel with T2 hardware support
 - Trackpad/touchpad drivers
 - Touch Bar support
@@ -74,6 +74,7 @@ sudo bash scripts/master_install.sh
 ### 5. Kernel Parameters
 - `intel_iommu=on`
 - `iommu=pt`
+- `pm_async=off`
 - `pcie_ports=compat`
 
 ---
@@ -94,7 +95,8 @@ Located in `scripts/` directory:
 | `01_install_wifi_bluetooth.sh` | WiFi and Bluetooth firmware |
 | `02_install_t2_kernel.sh` | T2-patched kernel |
 | `03_install_apple_bce.sh` | T2 keyboard/trackpad driver |
-| `04_setup_t2_audio.sh` | Microphone configuration |
+| `04_setup_t2_audio.sh` | Microphone configuration (wrapper) |
+| `fix_mic.sh` | Direct microphone fix/apply |
 | `05_finalize_setup.sh` | Kernel parameters, cleanup |
 | `diagnostics.sh` | Check hardware status |
 
@@ -143,7 +145,7 @@ Quick checks:
 ```bash
 # Check kernel version
 uname -r
-# Should show: 6.12.x-x-t2-noble
+# Should include: -t2-
 
 # Check apple-bce is loaded
 lsmod | grep apple_bce
@@ -186,7 +188,7 @@ This setup is based on the amazing work of:
 - **RAM**: 8GB/16GB
 - **Storage**: 256GB/512GB NVMe SSD
 - **OS**: Zorin OS 17 (Ubuntu 24.04 Noble)
-- **Kernel**: 6.12.61-1-t2-noble
+- **Kernel**: Any current `*-t2-*` build for Noble
 
 Should also work on:
 - MacBookPro15,1 (2018 15" with Touch Bar)

@@ -8,18 +8,24 @@ echo "Installing T2-patched kernel..."
 echo ""
 
 CODENAME="noble"
+KEYRING_DIR="/etc/apt/keyrings"
+KEYRING_PATH="$KEYRING_DIR/t2-ubuntu-repo.gpg"
+LIST_PATH="/etc/apt/sources.list.d/t2.list"
+
+# Ensure repo tooling is present
+apt-get update
+apt-get install -y ca-certificates curl gpg
 
 # Add repository GPG key
 echo "Adding T2 kernel repository..."
-curl -s --compressed "https://adityagarg8.github.io/t2-ubuntu-repo/KEY.gpg" | \
-    gpg --dearmor | tee /etc/apt/trusted.gpg.d/t2-ubuntu-repo.gpg >/dev/null
+mkdir -p "$KEYRING_DIR"
+curl -fsSL --compressed "https://adityagarg8.github.io/t2-ubuntu-repo/KEY.gpg" | \
+    gpg --dearmor -o "$KEYRING_PATH"
 
 # Create sources list
-curl -s --compressed -o /etc/apt/sources.list.d/t2.list \
-    "https://adityagarg8.github.io/t2-ubuntu-repo/t2.list"
-
-echo "deb [signed-by=/etc/apt/trusted.gpg.d/t2-ubuntu-repo.gpg] https://github.com/AdityaGarg8/t2-ubuntu-repo/releases/download/${CODENAME} ./" | \
-    tee -a /etc/apt/sources.list.d/t2.list
+cat > "$LIST_PATH" << EOF
+deb [signed-by=$KEYRING_PATH] https://github.com/AdityaGarg8/t2-ubuntu-repo/releases/download/${CODENAME} ./
+EOF
 
 # Update and install
 apt-get update

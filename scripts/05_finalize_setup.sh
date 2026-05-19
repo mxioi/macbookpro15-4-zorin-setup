@@ -24,6 +24,7 @@ CURRENT_OPTS=$(echo "$CURRENT_LINE" | sed 's/GRUB_CMDLINE_LINUX_DEFAULT=//' | se
 NEW_OPTS="$CURRENT_OPTS"
 echo "$NEW_OPTS" | grep -q "intel_iommu=on" || NEW_OPTS="$NEW_OPTS intel_iommu=on"
 echo "$NEW_OPTS" | grep -q "iommu=pt" || NEW_OPTS="$NEW_OPTS iommu=pt"
+echo "$NEW_OPTS" | grep -q "pm_async=off" || NEW_OPTS="$NEW_OPTS pm_async=off"
 echo "$NEW_OPTS" | grep -q "pcie_ports=compat" || NEW_OPTS="$NEW_OPTS pcie_ports=compat"
 
 # Clean up extra spaces
@@ -60,5 +61,6 @@ echo ""
 echo "Kernel parameters added:"
 echo "  - intel_iommu=on"
 echo "  - iommu=pt"
+echo "  - pm_async=off"
 echo "  - pcie_ports=compat"
 echo ""

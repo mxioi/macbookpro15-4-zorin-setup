@@ -23,7 +23,7 @@ sudo reboot
 bash scripts/diagnostics.sh
 
 # Check kernel
-uname -r  # Should be: 6.12.x-x-t2-noble
+uname -r  # Should include: -t2-
 
 # Check apple-bce loaded
 lsmod | grep apple_bce
