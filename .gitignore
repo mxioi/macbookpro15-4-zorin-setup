@@ -37,3 +37,6 @@ Module.symvers
 # Test recordings
 test.wav
 *.wav
+
+# Offline bundles
+t2-offline-bundle-*.tar.gz

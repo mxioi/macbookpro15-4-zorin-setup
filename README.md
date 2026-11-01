@@ -32,6 +32,7 @@ This repository gets **all hardware working** on your T2 MacBook, including keyb
 1. **Install Zorin OS 17** (based on Ubuntu 24.04)
 2. **Boot with external USB keyboard and mouse** (internal keyboard/trackpad won't work initially)
 3. **Connect to internet** via Ethernet adapter or USB WiFi dongle
+   (no network adapter? see the [offline installer](docs/OFFLINE_INSTALL.md))
 
 ### One-Command Installation
 
@@ -42,6 +43,24 @@ sudo bash scripts/master_install.sh
 ```
 
 **Then reboot.** Everything will work!
+
+### 📴 No Network on the MacBook? Use the Offline Installer
+
+If you have no Ethernet adapter or USB WiFi dongle, `apt install` cannot work.
+Build an offline bundle on any other internet-connected Linux machine, copy it
+over on a USB stick, and install without a network:
+
+```bash
+# On a machine WITH internet
+bash scripts/offline/build_offline_bundle.sh ~/
+
+# On the MacBook (no internet needed)
+tar -xzf t2-offline-bundle-noble-amd64.tar.gz
+cd t2-offline-bundle-noble-amd64
+sudo bash install.sh
+```
+
+See [docs/OFFLINE_INSTALL.md](docs/OFFLINE_INSTALL.md) for details.
 
 ---
 
@@ -99,6 +118,8 @@ Located in `scripts/` directory:
 | `fix_mic.sh` | Direct microphone fix/apply |
 | `05_finalize_setup.sh` | Kernel parameters, cleanup |
 | `diagnostics.sh` | Check hardware status |
+| `offline/build_offline_bundle.sh` | Build offline bundle (on another PC) |
+| `offline/offline_install.sh` | Install from the bundle with no network |
 
 ---
 
@@ -161,6 +182,7 @@ dmesg | grep -i brcmfmac
 
 ## 📚 Documentation
 
+- [Offline Installation Guide](docs/OFFLINE_INSTALL.md)
 - [Manual Installation Guide](docs/MANUAL_INSTALL.md)
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 - [Hardware Reference](docs/HARDWARE_REFERENCE.md)
