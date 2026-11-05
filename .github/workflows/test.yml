@@ -20,7 +20,10 @@ jobs:
 
     - name: Check shell scripts
       run: |
-        find scripts -name "*.sh" -exec shellcheck {} \;
+        shellcheck -x -S warning scripts/*.sh tests/*.sh
+
+    - name: Self-test shared helpers
+      run: bash tests/test_lib_os.sh
 
   markdown-lint:
     runs-on: ubuntu-latest

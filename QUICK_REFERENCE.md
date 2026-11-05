@@ -1,6 +1,8 @@
 # Quick Reference
 
-Fast command reference for common tasks.
+Fast command reference for common tasks on **Zorin OS / Ubuntu**. Hardware
+checks work on any distro; `apt`/GRUB commands don't. Other distros: see
+[docs/distros/](docs/distros/).
 
 ---
 
@@ -8,7 +10,7 @@ Fast command reference for common tasks.
 
 ```bash
 # One-command install
-git clone https://github.com/YOUR_USERNAME/macbookpro15-4-zorin-setup.git
+git clone https://github.com/mxioi/macbookpro15-4-zorin-setup.git
 cd macbookpro15-4-zorin-setup
 sudo bash scripts/master_install.sh
 sudo reboot
@@ -25,8 +27,8 @@ bash scripts/diagnostics.sh
 # Check kernel
 uname -r  # Should include: -t2-
 
-# Check apple-bce loaded
-lsmod | grep apple_bce
+# Check T2 bridge driver loaded (t2bce, or apple_bce on older kernels)
+lsmod | grep -E '^(t2bce|apple_bce)'
 
 # Check WiFi
 iwconfig
@@ -62,10 +64,10 @@ glxinfo | grep "OpenGL renderer"
 
 ```bash
 # Reload WiFi
-sudo modprobe -r brcmfmac && sudo modprobe brcmfmac
+sudo modprobe -r brcmfmac_wcc; sudo modprobe -r brcmfmac && sudo modprobe brcmfmac
 
-# Reload apple-bce
-sudo modprobe -r apple-bce && sudo modprobe apple-bce
+# Check Wi-Fi firmware loaded
+sudo journalctl -k --grep=brcmfmac | tail -5
 
 # Restart audio
 systemctl --user restart pipewire pipewire-pulse wireplumber
@@ -83,9 +85,8 @@ journalctl -b | grep -i "error\|fail" | tail -50
 # List installed kernels
 dpkg -l | grep linux-image
 
-# Remove stock kernel (if T2 kernel installed)
-sudo apt remove --purge linux-image-generic linux-headers-generic
-sudo apt autoremove
+# Remove stock kernel - ONLY after the T2 kernel has booted and works
+sudo bash scripts/06_remove_stock_kernel.sh
 
 # Update GRUB
 sudo update-grub
@@ -121,13 +122,9 @@ gnome-control-center mouse
 sudo apt update
 sudo apt upgrade
 
-# Rebuild apple-bce (after kernel update)
-cd /tmp/apple-bce-drv
-git pull
-make clean && make
-sudo make install
-sudo depmod -a
-sudo modprobe -r apple-bce && sudo modprobe apple-bce
+# Nothing to rebuild after a kernel update: the T2 driver is in the kernel.
+# If the driver name changed (apple-bce -> t2bce), reconfigure:
+sudo bash scripts/03_configure_t2_modules.sh && sudo update-initramfs -u -k all
 
 # Check for T2 kernel updates
 sudo apt update
@@ -187,28 +184,21 @@ sudo boltctl list
 
 ```bash
 # Boot with external keyboard/mouse
-# At GRUB: Select "Advanced options" → T2 kernel
+# At GRUB (hold Shift): "Advanced options" → T2 kernel, or the stock kernel as fallback
 
 # If keyboard doesn't work:
-sudo modprobe apple-bce
+sudo modprobe t2bce_vhci || sudo modprobe apple-bce
 
 # If WiFi doesn't work:
 sudo modprobe brcmfmac
-
-# If nothing works, boot from USB and:
-sudo chroot /mnt
-cd /tmp/apple-bce-drv
-make clean && make && make install
-exit
-reboot
 ```
 
 ---
 
 ## Useful Links
 
-- **This repo:** https://github.com/YOUR_USERNAME/macbookpro15-4-zorin-setup
+- **This repo:** https://github.com/mxioi/macbookpro15-4-zorin-setup
 - **t2linux wiki:** https://wiki.t2linux.org
-- **T2 Ubuntu Kernel:** https://github.com/t2linux/T2-Ubuntu-Kernel
-- **apple-bce driver:** https://github.com/t2linux/apple-bce-drv
+- **T2 Ubuntu/Debian Kernel:** https://github.com/t2linux/T2-Debian-and-Ubuntu-Kernel
+- **Wi-Fi/Bluetooth firmware guide:** https://wiki.t2linux.org/guides/wifi-bluetooth/
 - **t2-better-audio:** https://github.com/kekrby/t2-better-audio

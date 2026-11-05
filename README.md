@@ -1,220 +1,135 @@
-# MacBookPro15,4 Zorin OS Complete Setup
+# T2 MacBook Linux Setup
 
-Complete automated setup for **MacBookPro15,4 (2019 13" with Touch Bar)** running **Zorin OS 17 / Ubuntu 24.04**.
+Setup guide for **Intel MacBooks with the Apple T2 chip**, with separate
+instructions per distro. It started as (and is still tested as) a
+**Zorin OS setup for the MacBookPro15,4** (2019 13" with Touch Bar, two
+Thunderbolt ports).
 
-This repository gets **all hardware working** on your T2 MacBook, including keyboard, trackpad, Touch Bar, camera, microphone, WiFi, and Bluetooth.
-
----
-
-## ✅ What Works After Setup
-
-| Hardware | Status | Notes |
-|----------|--------|-------|
-| ✅ Keyboard | Working | Function keys, backlight |
-| ✅ Trackpad | Working | Full multitouch gestures |
-| ✅ Touch Bar | Working | Function keys display |
-| ✅ Speakers | Working | T2 audio output |
-| ✅ Microphone | Working | Built-in mic |
-| ✅ Camera | Working | FaceTime HD 720p |
-| ✅ WiFi | Working | BCM4377b3 |
-| ✅ Bluetooth | Working | BRCM4377 |
-| ✅ Display/GPU | Working | Intel Iris Plus 645, hardware acceleration |
-| ✅ Thunderbolt 3 | Working | All 4 USB-C ports |
-| ✅ USB-C Charging | Working | Any port |
-| ❌ Touch ID | Not supported | Locked to macOS by T2 chip |
+| Distro | Status |
+|---|---|
+| Zorin OS / Ubuntu | ✅ Tested on MacBookPro15,4 ([details](docs/hardware-support.md)) |
+| CachyOS | 🚧 ISO build in progress; hardware testing pending |
+| Others | ℹ️ Not tested here. Pointers to [t2linux](https://wiki.t2linux.org/) |
 
 ---
 
-## 🚀 Quick Start (Fresh Install)
+## Where to start
 
-### Prerequisites
+### I'm choosing a distro
+Check what's been tested and how each distro handles T2 hardware:
 
-1. **Install Zorin OS 17** (based on Ubuntu 24.04)
-2. **Boot with external USB keyboard and mouse** (internal keyboard/trackpad won't work initially)
-3. **Connect to internet** via Ethernet adapter or USB WiFi dongle
+- [Hardware support and testing status](docs/hardware-support.md)
+- [Drivers vs firmware](docs/drivers-and-firmware.md): why a distro can
+  "support T2" and still have no Wi-Fi
 
-### One-Command Installation
+### I've installed Linux but hardware doesn't work
+Follow the page for your distro:
+
+- [Zorin OS / Ubuntu](docs/distros/zorin-ubuntu.md) (or the automated
+  installer below)
+- [CachyOS](docs/distros/cachyos.md)
+- [Other distros](docs/distros/other.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+### I need Wi-Fi in the installer
+The Wi-Fi firmware is Apple's and no distro can ship it. Either:
+
+- copy it to the EFI partition from macOS before installing, then load it
+  in the live session: see [Drivers and firmware](docs/drivers-and-firmware.md#main-method-the-t2linux-firmware-script)
+  and the [CachyOS live-session steps](docs/distros/cachyos.md#installing)
+- or build a [custom CachyOS ISO with the firmware](docs/custom-iso/cachyos.md)
+- or use Ethernet / USB tethering during install
+
+---
+
+## Automated install: Zorin OS / Ubuntu only
+
+The scripts use `apt`, Ubuntu T2 kernel packages and GRUB. **Don't run
+them on CachyOS, Arch, Fedora or other distros.** The installer checks and
+refuses.
+
+Supported Ubuntu bases: `jammy` (22.04, Zorin OS 17), `noble` (24.04,
+Zorin OS 18), `resolute` (26.04), `stonking` (26.10). The installer reads
+yours from `/etc/os-release`.
+
+Before you start:
+
+1. Install Zorin OS / Ubuntu
+2. Plug in a USB keyboard and mouse (internal ones need the T2 kernel)
+3. Connect to the internet: Ethernet adapter, USB tethering or USB Wi-Fi dongle
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/macbookpro15-4-zorin-setup.git
+git clone https://github.com/mxioi/macbookpro15-4-zorin-setup.git
 cd macbookpro15-4-zorin-setup
 sudo bash scripts/master_install.sh
+sudo reboot
 ```
 
-**Then reboot.** Everything will work!
+After rebooting, check `uname -r` contains `-t2-` and run
+`bash scripts/diagnostics.sh`. If the stock kernel booted instead, pick the
+T2 one from GRUB's **Advanced options** (hold Shift at boot).
 
----
+**Only once the T2 kernel works**, remove the fallback stock kernel:
 
-## 📋 What Gets Installed
+```bash
+sudo bash scripts/06_remove_stock_kernel.sh
+```
 
-### 1. T2 Kernel
-- Patched kernel with T2 hardware support
-- Trackpad/touchpad drivers
-- Touch Bar support
-- Camera support
-- Source: [t2linux/T2-Ubuntu-Kernel](https://github.com/t2linux/T2-Ubuntu-Kernel)
-
-### 2. Apple BCE Driver
-- T2 chip communication driver
-- Keyboard and trackpad via virtual USB host controller
-- Audio support
-- Source: [t2linux/apple-bce-drv](https://github.com/t2linux/apple-bce-drv)
-
-### 3. WiFi Firmware (BCM4377b3)
-- Broadcom WiFi firmware extraction
-- Bluetooth firmware
-- Source: [t2linux WiFi guide](https://wiki.t2linux.org/guides/wifi-bluetooth/)
-
-### 4. T2 Audio Configuration
-- UCM (Use Case Manager) profiles
-- PipeWire configuration
-- Microphone DSP settings
-- Source: [kekrby/t2-better-audio](https://github.com/kekrby/t2-better-audio)
-
-### 5. Kernel Parameters
-- `intel_iommu=on`
-- `iommu=pt`
-- `pm_async=off`
-- `pcie_ports=compat`
-
----
-
-## 📖 Manual Installation (Step-by-Step)
-
-If you prefer to understand each step, see [docs/MANUAL_INSTALL.md](docs/MANUAL_INSTALL.md).
-
----
-
-## 🛠️ Individual Scripts
-
-Located in `scripts/` directory:
+### What the scripts do
 
 | Script | Purpose |
-|--------|---------|
-| `master_install.sh` | ⭐ Run everything automatically |
-| `01_install_wifi_bluetooth.sh` | WiFi and Bluetooth firmware |
-| `02_install_t2_kernel.sh` | T2-patched kernel |
-| `03_install_apple_bce.sh` | T2 keyboard/trackpad driver |
-| `04_setup_t2_audio.sh` | Microphone configuration (wrapper) |
-| `fix_mic.sh` | Direct microphone fix/apply |
-| `05_finalize_setup.sh` | Kernel parameters, cleanup |
-| `diagnostics.sh` | Check hardware status |
+|---|---|
+| `master_install.sh` | Runs 01–05 in order |
+| `01_install_wifi_bluetooth.sh` | Gets Apple Wi-Fi/Bluetooth firmware via the t2linux script |
+| `02_install_t2_kernel.sh` | Detects your Ubuntu base, adds the T2 apt repos, installs `linux-t2-lts`. Keeps the stock kernel |
+| `03_configure_t2_modules.sh` | Loads the T2 bridge driver (`t2bce`, or `apple-bce` on older kernels) at boot and in the initramfs |
+| `04_setup_t2_audio.sh` / `fix_mic.sh` | Microphone config ([t2-better-audio](https://github.com/kekrby/t2-better-audio)) |
+| `05_finalize_setup.sh` | Kernel parameters, GRUB, initramfs. Warns if GRUB will boot the stock kernel |
+| `06_remove_stock_kernel.sh` | Run by hand after verifying. Removes stock kernel metapackages |
+| `diagnostics.sh` | Hardware status report |
+| `lib_os.sh` | Shared helpers (tested by `tests/test_lib_os.sh`) |
+
+Kernel parameters set: `intel_iommu=on iommu=pt pm_async=off pcie_ports=compat`.
 
 ---
 
-## 🔧 Post-Installation
+## Documentation
 
-### Verify Everything Works
-
-```bash
-./scripts/diagnostics.sh
-```
-
-### Configure Trackpad Gestures
-
-Settings → Mouse & Touchpad → Touchpad:
-- ✅ Tap to click
-- ✅ Natural scrolling
-- ✅ Two-finger scrolling
-- ✅ Two-finger right-click
-
-### Test Microphone
-
-```bash
-arecord -f cd -d 5 test.wav
-aplay test.wav
-```
-
-Or: Settings → Sound → Input → Test microphone
-
-### Test Camera
-
-```bash
-sudo apt install cheese
-cheese
-```
+- [Hardware support and testing status](docs/hardware-support.md)
+- [Drivers vs firmware](docs/drivers-and-firmware.md)
+- [Zorin OS / Ubuntu manual install](docs/distros/zorin-ubuntu.md)
+- [CachyOS](docs/distros/cachyos.md)
+- [Custom CachyOS ISO with Wi-Fi firmware](docs/custom-iso/cachyos.md)
+- [Other distros](docs/distros/other.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Quick reference](QUICK_REFERENCE.md)
 
 ---
 
-## 🐛 Troubleshooting
+## Credits
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
+Built on the work of:
 
-Quick checks:
-
-```bash
-# Check kernel version
-uname -r
-# Should include: -t2-
-
-# Check apple-bce is loaded
-lsmod | grep apple_bce
-
-# Check WiFi firmware
-dmesg | grep -i brcmfmac
-
-# Full diagnostics
-./scripts/diagnostics.sh
-```
+- **[t2linux](https://github.com/t2linux)**: T2 Linux support project and [wiki](https://wiki.t2linux.org)
+- **[Aditya Garg](https://github.com/AdityaGarg8)**: T2 Ubuntu/Debian kernel and apt repo
+- **[MCMrARM](https://github.com/MCMrARM)**: original apple-bce driver
+- **[kekrby](https://github.com/kekrby)**: t2-better-audio configuration
+- **[CachyOS](https://cachyos.org)**: T2 kernel patches and live ISO tooling
+- **[NoaHimesaka1873](https://github.com/NoaHimesaka1873/apple-bcm-firmware)**: apple-bcm-firmware package
 
 ---
 
-## 📚 Documentation
+## License
 
-- [Manual Installation Guide](docs/MANUAL_INSTALL.md)
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
-- [Hardware Reference](docs/HARDWARE_REFERENCE.md)
-- [Kernel Parameters](docs/KERNEL_PARAMETERS.md)
+MIT. See [LICENSE](LICENSE). Apple firmware is **not** included in this
+repo and must not be redistributed.
 
----
+## Contributing
 
-## 🙏 Credits
+Test results from other models and distros are especially welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-This setup is based on the amazing work of:
+## Disclaimer
 
-- **[t2linux](https://github.com/t2linux)** - T2 Linux support project
-- **[Aditya Garg](https://github.com/AdityaGarg8)** - T2 Ubuntu kernel maintainer
-- **[MCMrARM](https://github.com/MCMrARM)** - Original apple-bce driver
-- **[kekrby](https://github.com/kekrby)** - t2-better-audio configuration
-- **[t2linux wiki](https://wiki.t2linux.org)** - Comprehensive documentation
-
----
-
-## 💻 Tested On
-
-- **Model**: MacBookPro15,4 (2019 13" with Touch Bar)
-- **CPU**: Intel Core i5-8257U (Coffee Lake)
-- **GPU**: Intel Iris Plus Graphics 645
-- **RAM**: 8GB/16GB
-- **Storage**: 256GB/512GB NVMe SSD
-- **OS**: Zorin OS 17 (Ubuntu 24.04 Noble)
-- **Kernel**: Any current `*-t2-*` build for Noble
-
-Should also work on:
-- MacBookPro15,1 (2018 15" with Touch Bar)
-- MacBookPro15,2 (2018 13" with Touch Bar)
-- MacBookPro15,3 (2019 15" with Touch Bar)
-- MacBookPro16,1 (2019 16")
-- Other T2 MacBooks with minor adjustments
-
----
-
-## 📄 License
-
-MIT License - Feel free to use, modify, and distribute.
-
----
-
-## 🤝 Contributing
-
-Improvements welcome! Please open an issue or pull request.
-
----
-
-## ⚠️ Disclaimer
-
-This setup modifies your system kernel and drivers. While tested and working, use at your own risk. Always backup your data before making system changes.
-
----
-
-**Enjoy your fully functional MacBook running Zorin OS!** 🎉
+These steps change your kernel and boot configuration. Back up first, and
+keep macOS if you can. You need it for T2 firmware updates.

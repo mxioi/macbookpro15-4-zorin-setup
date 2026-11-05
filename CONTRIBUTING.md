@@ -15,7 +15,9 @@ If you encounter problems:
 3. **Provide details:**
    - MacBook model (run: `cat /sys/class/dmi/id/product_name`)
    - Kernel version (run: `uname -r`)
-   - Zorin/Ubuntu version (run: `lsb_release -a`)
+   - Distro and version (run: `grep -E '^(PRETTY_NAME|UBUNTU_CODENAME)=' /etc/os-release`)
+   - Bridge driver (run: `lsmod | grep -E '^(t2bce|apple_bce)'`)
+   - For a custom ISO: the ISO build revision
    - Steps to reproduce
    - Error messages or logs
 
@@ -44,7 +46,8 @@ We welcome improvements! To contribute code:
    - Update documentation if needed
 
 4. **Test your changes:**
-   - Run shellcheck on scripts: `shellcheck scripts/*.sh`
+   - Run shellcheck on scripts: `shellcheck -x -S warning scripts/*.sh tests/*.sh`
+   - Run the self-test: `bash tests/test_lib_os.sh`
    - Test installation on fresh Zorin OS if possible
    - Verify all hardware still works
 
@@ -127,8 +130,9 @@ Before submitting changes:
 # Install shellcheck
 sudo apt install shellcheck
 
-# Check all scripts
-find scripts -name "*.sh" -exec shellcheck {} \;
+# Check all scripts (same as CI)
+shellcheck -x -S warning scripts/*.sh tests/*.sh
+bash tests/test_lib_os.sh
 ```
 
 ---
@@ -138,9 +142,13 @@ find scripts -name "*.sh" -exec shellcheck {} \;
 When adding features:
 
 - Update `README.md` if it affects quick start
-- Update `docs/MANUAL_INSTALL.md` with detailed steps
-- Update `docs/TROUBLESHOOTING.md` for common issues
-- Update `docs/HARDWARE_REFERENCE.md` for hardware changes
+- Update the distro page in `docs/distros/` with detailed steps
+- Update `docs/troubleshooting.md` for common issues
+- Update `docs/hardware-support.md` with test results (model, distro
+  version, kernel version, remaining issues). Mark untested instructions as
+  untested
+- Downloads: use `curl -fL`, and record a SHA-256 for any versioned file
+  people are told to install
 
 ---
 
