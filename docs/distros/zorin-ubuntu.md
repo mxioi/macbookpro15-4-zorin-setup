@@ -4,6 +4,9 @@ Step-by-step version of `scripts/master_install.sh`. These instructions
 are **only for Zorin OS, Ubuntu and Ubuntu derivatives** (apt + GRUB). On
 CachyOS or other distros, use [the other distro pages](../../README.md#where-to-start).
 
+**Shortcut:** installing from a live USB? [t2kit](../t2kit.md) does Steps
+1–4 and 6 from the live session before your first boot.
+
 **Testing status:** tested by the maintainer on a MacBookPro15,4 with Zorin
 OS. See [hardware-support.md](../hardware-support.md) for exact versions
 and remaining issues.

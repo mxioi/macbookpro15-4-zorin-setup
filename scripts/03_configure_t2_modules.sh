@@ -14,7 +14,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib_os.sh"
 
 INITRAMFS_MODULES="/etc/initramfs-tools/modules"
-MARKER="# T2 MacBook keyboard (added by macbook T2 setup)"
 
 T2_KERNEL=$(newest_t2_kernel)
 if [ -z "$T2_KERNEL" ]; then
@@ -44,13 +43,8 @@ printf '# T2 bridge driver\n%s\n' "$LOAD_MODULES" > /etc/modules-load.d/t2.conf
 
 # Load early so the internal keyboard works at a LUKS password prompt
 if [ -f "$INITRAMFS_MODULES" ]; then
-    # Drop any block from a previous run, then add the current one
-    sed -i "/^$MARKER\$/,/^# end T2\$/d" "$INITRAMFS_MODULES"
-    {
-        echo "$MARKER"
-        for m in $EARLY_MODULES; do echo "$m"; done
-        echo "# end T2"
-    } >> "$INITRAMFS_MODULES"
+    # shellcheck disable=SC2086
+    initramfs_tools_set_modules "$INITRAMFS_MODULES" $EARLY_MODULES
 fi
 
 # applespi drives pre-T2 SPI keyboards and is not needed on T2 Macs

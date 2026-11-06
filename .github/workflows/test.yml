@@ -20,10 +20,13 @@ jobs:
 
     - name: Check shell scripts
       run: |
-        shellcheck -x -S warning scripts/*.sh tests/*.sh
+        shellcheck -x -S warning scripts/*.sh tests/*.sh t2kit/t2kit t2kit/lib/os.sh
 
     - name: Self-test shared helpers
       run: bash tests/test_lib_os.sh
+
+    - name: Self-test t2kit against fake systems
+      run: bash tests/test_t2kit.sh
 
   markdown-lint:
     runs-on: ubuntu-latest

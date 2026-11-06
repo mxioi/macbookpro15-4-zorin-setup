@@ -6,6 +6,11 @@
 > be published in [hardware-support.md](../hardware-support.md) with the
 > exact ISO build revision.
 
+**Easiest route:** [t2kit](../t2kit.md). Run `t2kit live` in the live
+session, then `t2kit install /mnt` after installing. It handles the
+firmware, the `t2bce`/`apple-bce` mkinitcpio problem below, and the kernel
+parameters. The steps on this page are the manual equivalent.
+
 **Don't run this repo's `scripts/` on CachyOS.** They use `apt`, Ubuntu
 kernel packages and `update-grub`, none of which apply here.
 

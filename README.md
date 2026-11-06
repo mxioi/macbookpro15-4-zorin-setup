@@ -13,6 +13,25 @@ Thunderbolt ports).
 
 ---
 
+## New: t2kit, one USB for any supported distro
+
+[**t2kit**](docs/t2kit.md) is a script you keep on your Ventoy USB next to
+your distro ISOs. It loads Wi-Fi firmware in any live session, then, after
+the installer finishes and before you reboot, sets up the installed system:
+firmware, T2 package sources, kernel, keyboard driver, kernel parameters.
+
+```bash
+sudo bash T2KIT/t2kit live            # Wi-Fi in the live session
+# ...run the distro's installer, don't reboot...
+sudo bash T2KIT/t2kit install /mnt    # set up the installed system
+```
+
+Status: works on Ubuntu-based (apt) and CachyOS/Arch-based (pacman)
+systems. Tested against a real Ubuntu 22.04 system, not yet on Mac
+hardware. See [docs/t2kit.md](docs/t2kit.md).
+
+---
+
 ## Where to start
 
 ### I'm choosing a distro
@@ -34,6 +53,7 @@ Follow the page for your distro:
 ### I need Wi-Fi in the installer
 The Wi-Fi firmware is Apple's and no distro can ship it. Either:
 
+- capture it once into [t2kit](docs/t2kit.md) and run `t2kit live` in any live session
 - copy it to the EFI partition from macOS before installing, then load it
   in the live session: see [Drivers and firmware](docs/drivers-and-firmware.md#main-method-the-t2linux-firmware-script)
   and the [CachyOS live-session steps](docs/distros/cachyos.md#installing)
@@ -87,7 +107,7 @@ sudo bash scripts/06_remove_stock_kernel.sh
 | `05_finalize_setup.sh` | Kernel parameters, GRUB, initramfs. Warns if GRUB will boot the stock kernel |
 | `06_remove_stock_kernel.sh` | Run by hand after verifying. Removes stock kernel metapackages |
 | `diagnostics.sh` | Hardware status report |
-| `lib_os.sh` | Shared helpers (tested by `tests/test_lib_os.sh`) |
+| `lib_os.sh` | Loads the shared helpers from `t2kit/lib/os.sh` (tested by `tests/test_lib_os.sh`) |
 
 Kernel parameters set: `intel_iommu=on iommu=pt pm_async=off pcie_ports=compat`.
 
@@ -97,6 +117,7 @@ Kernel parameters set: `intel_iommu=on iommu=pt pm_async=off pcie_ports=compat`.
 
 - [Hardware support and testing status](docs/hardware-support.md)
 - [Drivers vs firmware](docs/drivers-and-firmware.md)
+- [t2kit: one USB for any supported distro](docs/t2kit.md)
 - [Zorin OS / Ubuntu manual install](docs/distros/zorin-ubuntu.md)
 - [CachyOS](docs/distros/cachyos.md)
 - [Custom CachyOS ISO with Wi-Fi firmware](docs/custom-iso/cachyos.md)

@@ -20,6 +20,11 @@ Thumbs.db
 *.swp
 *.swo
 
+# Apple firmware must never be committed (not redistributable)
+t2kit/firmware/
+*.pkg.tar.zst
+firmware.tar
+
 # Downloaded firmware (large files)
 *.bin
 *.hcd

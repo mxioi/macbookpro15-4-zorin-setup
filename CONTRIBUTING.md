@@ -47,7 +47,7 @@ We welcome improvements! To contribute code:
 
 4. **Test your changes:**
    - Run shellcheck on scripts: `shellcheck -x -S warning scripts/*.sh tests/*.sh`
-   - Run the self-test: `bash tests/test_lib_os.sh`
+   - Run the self-tests: `bash tests/test_lib_os.sh && bash tests/test_t2kit.sh`
    - Test installation on fresh Zorin OS if possible
    - Verify all hardware still works
 
@@ -131,8 +131,9 @@ Before submitting changes:
 sudo apt install shellcheck
 
 # Check all scripts (same as CI)
-shellcheck -x -S warning scripts/*.sh tests/*.sh
+shellcheck -x -S warning scripts/*.sh tests/*.sh t2kit/t2kit t2kit/lib/os.sh
 bash tests/test_lib_os.sh
+bash tests/test_t2kit.sh
 ```
 
 ---

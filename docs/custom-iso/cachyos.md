@@ -5,6 +5,11 @@
 > Bluetooth, keyboard and trackpad hasn't been done yet. Results will go
 > in [hardware-support.md](../hardware-support.md) with the ISO revision.
 
+**You may not need a custom ISO.** [t2kit](../t2kit.md) gives any live ISO
+Wi-Fi from a firmware copy kept on the same USB stick, and sets up the
+installed system afterwards. Build a custom ISO only if you want the
+firmware baked into one image.
+
 The official CachyOS ISO has T2 drivers but no Apple Wi-Fi firmware (it
 can't be redistributed). This builds your own ISO with the firmware added,
 so Wi-Fi works in the live installer without Ethernet.
