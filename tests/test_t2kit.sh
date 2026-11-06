@@ -94,11 +94,11 @@ mkdir -p "$U/etc/modules-load.d" && echo apple-bce > "$U/etc/modules-load.d/appl
 bash "$T2KIT" install "$U" > "$TMP/u.out" 2>&1 || { cat "$TMP/u.out"; FAILS=$((FAILS + 1)); }
 check "ubuntu: firmware copied" "3" "$(find "$U/usr/lib/firmware/brcm" -type f | wc -l)"
 check "ubuntu: release repo uses detected codename" "1" "$(grep -c 'releases/download/jammy ./' "$U/etc/apt/sources.list.d/t2.list")"
-check "ubuntu: key installed" "0" "$(test -s "$U/etc/apt/trusted.gpg.d/t2-ubuntu-repo.gpg"; echo $?)"
+check "ubuntu: key installed" "0" "$(if test -s "$U/etc/apt/trusted.gpg.d/t2-ubuntu-repo.gpg"; then echo 0; else echo 1; fi)"
 check "ubuntu: T2 kernel installed" "1" "$(grep -c '^apt-get install -y linux-t2-lts$' "$U/chroot.log")"
 check "ubuntu: boot partition mounted from fstab" "1" "$(grep -c '^mount /boot/efi$' "$U/chroot.log")"
 check "ubuntu: t2bce loads at boot" "t2bce_vhci" "$(grep -v '^#' "$U/etc/modules-load.d/t2.conf")"
-check "ubuntu: old apple-bce.conf removed" "1" "$(test -e "$U/etc/modules-load.d/apple-bce.conf"; echo $?)"
+check "ubuntu: old apple-bce.conf removed" "1" "$(if test -e "$U/etc/modules-load.d/apple-bce.conf"; then echo 0; else echo 1; fi)"
 check "ubuntu: initramfs modules" "t2bce_dma t2bce_core t2bce_vhci" "$(sed -n '/^# T2 MacBook/,/^# end T2/p' "$U/etc/initramfs-tools/modules" | grep -v '^#' | xargs)"
 check "ubuntu: grub params kept + added" 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_iommu=on iommu=pt pm_async=off"' "$(cat "$U/etc/default/grub")"
 check "ubuntu: initramfs rebuilt then grub" "update-initramfs -u -k all|update-grub" "$(grep -E '^update-' "$U/chroot.log" | paste -sd'|')"

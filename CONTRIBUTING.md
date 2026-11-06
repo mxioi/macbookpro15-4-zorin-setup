@@ -36,6 +36,7 @@ We welcome improvements! To contribute code:
 
 1. **Fork the repository**
 2. **Create a feature branch:**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -52,14 +53,17 @@ We welcome improvements! To contribute code:
    - Verify all hardware still works
 
 5. **Commit with clear messages:**
+
    ```bash
    git commit -m "Add: Brief description of changes"
    ```
 
 6. **Push and create PR:**
+
    ```bash
    git push origin feature/your-feature-name
    ```
+
    Then open a Pull Request on GitHub
 
 ---
@@ -76,6 +80,7 @@ We welcome improvements! To contribute code:
 - Check exit codes for critical commands
 
 **Example:**
+
 ```bash
 #!/bin/bash
 set -e
@@ -107,16 +112,19 @@ Before submitting changes:
 ### Manual Testing
 
 1. **Test on fresh install** (if possible):
+
    ```bash
    sudo bash scripts/master_install.sh
    ```
 
 2. **Verify all hardware works:**
+
    ```bash
    bash scripts/diagnostics.sh
    ```
 
 3. **Test individual scripts:**
+
    ```bash
    sudo bash scripts/01_install_wifi_bluetooth.sh
    # Test WiFi
@@ -177,7 +185,7 @@ To add support for other T2 MacBooks:
 
 Use conventional commit format:
 
-```
+```text
 Type: Short description
 
 Longer description if needed.
@@ -187,6 +195,7 @@ Longer description if needed.
 ```
 
 **Types:**
+
 - `Add:` New feature or script
 - `Fix:` Bug fix
 - `Update:` Update existing feature
@@ -195,7 +204,8 @@ Longer description if needed.
 - `Test:` Add or update tests
 
 **Examples:**
-```
+
+```text
 Add: Support for MacBookPro16,1
 
 - Add WiFi firmware for BCM4364

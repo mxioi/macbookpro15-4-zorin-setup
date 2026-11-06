@@ -135,7 +135,7 @@ sudo apt list --upgradable | grep t2
 
 ## File Locations
 
-```
+```text
 # Kernel modules
 /lib/modules/$(uname -r)/
 
@@ -197,8 +197,8 @@ sudo modprobe brcmfmac
 
 ## Useful Links
 
-- **This repo:** https://github.com/mxioi/macbookpro15-4-zorin-setup
-- **t2linux wiki:** https://wiki.t2linux.org
-- **T2 Ubuntu/Debian Kernel:** https://github.com/t2linux/T2-Debian-and-Ubuntu-Kernel
-- **Wi-Fi/Bluetooth firmware guide:** https://wiki.t2linux.org/guides/wifi-bluetooth/
-- **t2-better-audio:** https://github.com/kekrby/t2-better-audio
+- **This repo:** <https://github.com/mxioi/macbookpro15-4-zorin-setup>
+- **t2linux wiki:** <https://wiki.t2linux.org>
+- **T2 Ubuntu/Debian Kernel:** <https://github.com/t2linux/T2-Debian-and-Ubuntu-Kernel>
+- **Wi-Fi/Bluetooth firmware guide:** <https://wiki.t2linux.org/guides/wifi-bluetooth/>
+- **t2-better-audio:** <https://github.com/kekrby/t2-better-audio>

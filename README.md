@@ -35,6 +35,7 @@ hardware. See [docs/t2kit.md](docs/t2kit.md).
 ## Where to start
 
 ### I'm choosing a distro
+
 Check what's been tested and how each distro handles T2 hardware:
 
 - [Hardware support and testing status](docs/hardware-support.md)
@@ -42,6 +43,7 @@ Check what's been tested and how each distro handles T2 hardware:
   "support T2" and still have no Wi-Fi
 
 ### I've installed Linux but hardware doesn't work
+
 Follow the page for your distro:
 
 - [Zorin OS / Ubuntu](docs/distros/zorin-ubuntu.md) (or the automated
@@ -51,6 +53,7 @@ Follow the page for your distro:
 - [Troubleshooting](docs/troubleshooting.md)
 
 ### I need Wi-Fi in the installer
+
 The Wi-Fi firmware is Apple's and no distro can ship it. Either:
 
 - capture it once into [t2kit](docs/t2kit.md) and run `t2kit live` in any live session

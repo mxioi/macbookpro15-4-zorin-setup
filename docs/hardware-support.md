@@ -65,6 +65,7 @@ Other T2 models (MacBookPro15,1/15,2/15,3/16,x, MacBookAir, iMac) are
 **Model:** MacBookPro15,4 (2019 13" with Touch Bar, two Thunderbolt 3 ports, A2159)
 
 ### Processor
+
 - **CPU:** Intel Core i5-8257U / i7-8557U (Coffee Lake)
 - **Cores:** 4 cores, 8 threads
 - **Base Clock:** 1.4 GHz (i5) / 1.7 GHz (i7)
@@ -72,12 +73,14 @@ Other T2 models (MacBookPro15,1/15,2/15,3/16,x, MacBookAir, iMac) are
 - **TDP:** 15W
 
 ### Graphics
+
 - **iGPU:** Intel Iris Plus Graphics 645
 - **Execution Units:** 48 EUs
 - **Memory:** Shared system RAM
 - **Display Output:** Thunderbolt 3 (DisplayPort 1.4)
 
 ### Display
+
 - **Size:** 13.3" diagonal
 - **Resolution:** 2560 x 1600 (WQXGA)
 - **PPI:** 227 pixels per inch
@@ -86,17 +89,20 @@ Other T2 models (MacBookPro15,1/15,2/15,3/16,x, MacBookAir, iMac) are
 - **Brightness:** 500 nits
 
 ### Memory
+
 - **Type:** LPDDR3
 - **Speed:** 2133 MHz
 - **Capacity:** 8GB or 16GB
 - **Soldered:** Yes (not upgradeable)
 
 ### Storage
+
 - **Type:** NVMe PCIe 3.0 SSD
 - **Capacity:** 256GB, 512GB, 1TB, 2TB
 - **Controller:** Apple T2 chip
 
 ### Connectivity
+
 - **Thunderbolt 3:** 2× USB-C ports (both on the left; the four-port 13" is MacBookPro15,2)
   - Power Delivery
   - DisplayPort 1.4
@@ -107,28 +113,34 @@ Other T2 models (MacBookPro15,1/15,2/15,3/16,x, MacBookAir, iMac) are
 - **Audio Jack:** 3.5mm combo (TRRS)
 
 ### Input
+
 - **Keyboard:** Magic Keyboard (2019, scissor switch)
 - **Trackpad:** Force Touch trackpad
 - **Touch Bar:** OLED multitouch strip
 - **Touch ID:** Fingerprint sensor (NOT supported in Linux)
 
 ### Audio
+
 - **Speakers:** Stereo speakers
 - **Microphones:** 3-microphone array
 - **Controller:** Apple T2 chip
 
 ### Camera
+
 - **Type:** FaceTime HD Camera
 - **Resolution:** 720p
 - **Controller:** Apple T2 chip
 
 ### Battery
+
 - **Capacity:** 58.2 Wh
 - **Type:** Lithium-polymer
 - **Charging:** USB-C Power Delivery (either port)
 
 ### Apple T2 Chip
+
 Custom Apple Silicon security coprocessor that controls:
+
 - Storage controller (NVMe)
 - System Management Controller (SMC)
 - Image Signal Processor (camera)
@@ -161,14 +173,17 @@ These figures were not measured with a recorded method. Treat them as rough guid
 ### Power Consumption
 
 ### Idle
+
 - **macOS:** ~3-4W
 - **Linux:** ~4-5W
 
 ### Light Use (Web browsing)
+
 - **macOS:** ~8-10W
 - **Linux:** ~10-12W
 
 ### Heavy Use (Compilation)
+
 - **macOS:** ~25-30W
 - **Linux:** ~25-30W
 
@@ -179,11 +194,13 @@ These figures were not measured with a recorded method. Treat them as rough guid
 ### Thermal Management
 
 ### Throttling
+
 - **CPU:** Throttles at 100°C (same as macOS)
 - **Fan:** Kicks in around 60-65°C
 - **Max RPM:** ~7200 RPM
 
 ### Linux vs macOS
+
 - Linux may run slightly warmer at idle
 - Fan curve is less aggressive than macOS
 - Under load, thermals are similar
@@ -193,16 +210,19 @@ These figures were not measured with a recorded method. Treat them as rough guid
 ## Known Hardware Quirks
 
 ### T2 Chip Communication
+
 - All internal devices go through T2 chip
 - Requires the T2 bridge driver (`t2bce`, formerly `apple-bce`) for access
 - Some devices appear as USB over virtual host controller
 
 ### Suspend Issues
+
 - T2 chip doesn't properly reinitialize after suspend
 - May cause system hangs
 - Recommendation: Disable suspend or use hibernate
 
 ### Firmware Updates
+
 - T2 firmware updates require macOS
 - Keep a macOS partition for firmware updates
 
