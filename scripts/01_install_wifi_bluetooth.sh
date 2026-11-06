@@ -1,43 +1,66 @@
 #!/bin/bash
-# Install WiFi and Bluetooth Firmware for BCM4377b3
-# For MacBookPro15,4 T2 Models
+# Install Wi-Fi and Bluetooth firmware for T2 MacBooks
+# Uses the upstream t2linux firmware script:
+#   https://wiki.t2linux.org/guides/wifi-bluetooth/
+#
+# The firmware is Apple's and cannot be redistributed, so it is extracted
+# from your own macOS install, its EFI partition copy, or an Apple recovery
+# image. The script asks which method to use.
 
 set -e
 
-echo "Installing WiFi and Bluetooth firmware..."
+FIRMWARE_SCRIPT_URL="https://wiki.t2linux.org/tools/firmware.sh"
+
+echo "Installing Wi-Fi and Bluetooth firmware..."
 echo ""
 
-# Install required tools
+# python3 is used by the firmware script to rename the files
 apt-get update
-apt-get install -y curl git
+apt-get install -y curl python3
 
-# Create firmware directory
 mkdir -p /lib/firmware/brcm
 
-# Download firmware files
-echo "Downloading BCM4377b3 WiFi firmware..."
-curl -sL -o /lib/firmware/brcm/brcmfmac4377b3-pcie.bin \
-    "https://packages.aunali1.com/apple/wifi-fw/18G2022/brcmfmac4377b3-pcie.bin"
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 
-curl -sL -o /lib/firmware/brcm/brcmfmac4377b3-pcie.apple,tahiti-SPPR-m-4c.txt \
-    "https://packages.aunali1.com/apple/wifi-fw/18G2022/brcmfmac4377b3-pcie.apple,tahiti-SPPR-m-4c.txt"
+echo "Downloading the t2linux firmware script..."
+# -f makes HTTP errors (404, 500) fail instead of saving an error page
+if ! curl -fL --retry 3 -o "$WORKDIR/firmware.sh" "$FIRMWARE_SCRIPT_URL"; then
+    echo "Error: could not download $FIRMWARE_SCRIPT_URL"
+    echo "See docs/drivers-and-firmware.md for other ways to get the firmware."
+    exit 1
+fi
 
-curl -sL -o /lib/firmware/brcm/brcmfmac4377b3-pcie.clm_blob \
-    "https://packages.aunali1.com/apple/wifi-fw/18G2022/brcmfmac4377b3-pcie.clm_blob"
-
-echo "Downloading Bluetooth firmware..."
-curl -sL -o /lib/firmware/brcm/BCM4377B3.hcd \
-    "https://packages.aunali1.com/apple/wifi-fw/18G2022/BCM4377B3.hcd"
-
-echo "✓ WiFi and Bluetooth firmware installed"
+# Refuse to run anything that is not a bash script that parses cleanly
+if ! head -1 "$WORKDIR/firmware.sh" | grep -q '^#!.*bash' || ! bash -n "$WORKDIR/firmware.sh"; then
+    echo "Error: the downloaded file is not a valid bash script. Not running it."
+    exit 1
+fi
+echo "firmware.sh sha256: $(sha256sum "$WORKDIR/firmware.sh" | cut -d' ' -f1)"
+echo ""
+echo "Choose a method in the next menu:"
+echo "  - macOS still installed:      'Retrieve the firmware directly from macOS'"
+echo "  - ran copy_to_efi in macOS:   'Retrieve the firmware from the EFI partition'"
+echo "  - macOS removed:              'Download a macOS Recovery Image' (Monterey to Sonoma)"
 echo ""
 
-# Load kernel modules
-echo "Loading WiFi module..."
+bash "$WORKDIR/firmware.sh"
+
+if ls /lib/firmware/brcm/brcmfmac*apple* >/dev/null 2>&1; then
+    echo "✓ Apple Wi-Fi firmware present in /lib/firmware/brcm"
+else
+    echo "Error: no Apple Wi-Fi firmware found in /lib/firmware/brcm after running the script."
+    exit 1
+fi
+
+# Reload the drivers; on a stock kernel Wi-Fi may only appear after
+# rebooting into the T2 kernel.
+modprobe -r brcmfmac_wcc 2>/dev/null || true
 modprobe -r brcmfmac 2>/dev/null || true
-modprobe brcmfmac
+modprobe brcmfmac 2>/dev/null || true
+modprobe -r hci_bcm4377 2>/dev/null || true
+modprobe hci_bcm4377 2>/dev/null || true
 
-echo "✓ WiFi firmware loaded"
 echo ""
-echo "You can connect to WiFi now!"
+echo "✓ Firmware installed. Wi-Fi may not appear until you boot the T2 kernel."
 echo ""

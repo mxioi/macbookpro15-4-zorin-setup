@@ -15,7 +15,9 @@ If you encounter problems:
 3. **Provide details:**
    - MacBook model (run: `cat /sys/class/dmi/id/product_name`)
    - Kernel version (run: `uname -r`)
-   - Zorin/Ubuntu version (run: `lsb_release -a`)
+   - Distro and version (run: `grep -E '^(PRETTY_NAME|UBUNTU_CODENAME)=' /etc/os-release`)
+   - Bridge driver (run: `lsmod | grep -E '^(t2bce|apple_bce)'`)
+   - For a custom ISO: the ISO build revision
    - Steps to reproduce
    - Error messages or logs
 
@@ -34,6 +36,7 @@ We welcome improvements! To contribute code:
 
 1. **Fork the repository**
 2. **Create a feature branch:**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -44,19 +47,23 @@ We welcome improvements! To contribute code:
    - Update documentation if needed
 
 4. **Test your changes:**
-   - Run shellcheck on scripts: `shellcheck scripts/*.sh`
+   - Run shellcheck on scripts: `shellcheck -x -S warning scripts/*.sh tests/*.sh`
+   - Run the self-tests: `bash tests/test_lib_os.sh && bash tests/test_t2kit.sh`
    - Test installation on fresh Zorin OS if possible
    - Verify all hardware still works
 
 5. **Commit with clear messages:**
+
    ```bash
    git commit -m "Add: Brief description of changes"
    ```
 
 6. **Push and create PR:**
+
    ```bash
    git push origin feature/your-feature-name
    ```
+
    Then open a Pull Request on GitHub
 
 ---
@@ -73,6 +80,7 @@ We welcome improvements! To contribute code:
 - Check exit codes for critical commands
 
 **Example:**
+
 ```bash
 #!/bin/bash
 set -e
@@ -104,16 +112,19 @@ Before submitting changes:
 ### Manual Testing
 
 1. **Test on fresh install** (if possible):
+
    ```bash
    sudo bash scripts/master_install.sh
    ```
 
 2. **Verify all hardware works:**
+
    ```bash
    bash scripts/diagnostics.sh
    ```
 
 3. **Test individual scripts:**
+
    ```bash
    sudo bash scripts/01_install_wifi_bluetooth.sh
    # Test WiFi
@@ -127,8 +138,10 @@ Before submitting changes:
 # Install shellcheck
 sudo apt install shellcheck
 
-# Check all scripts
-find scripts -name "*.sh" -exec shellcheck {} \;
+# Check all scripts (same as CI)
+shellcheck -x -S warning scripts/*.sh tests/*.sh t2kit/t2kit t2kit/lib/os.sh
+bash tests/test_lib_os.sh
+bash tests/test_t2kit.sh
 ```
 
 ---
@@ -138,9 +151,13 @@ find scripts -name "*.sh" -exec shellcheck {} \;
 When adding features:
 
 - Update `README.md` if it affects quick start
-- Update `docs/MANUAL_INSTALL.md` with detailed steps
-- Update `docs/TROUBLESHOOTING.md` for common issues
-- Update `docs/HARDWARE_REFERENCE.md` for hardware changes
+- Update the distro page in `docs/distros/` with detailed steps
+- Update `docs/troubleshooting.md` for common issues
+- Update `docs/hardware-support.md` with test results (model, distro
+  version, kernel version, remaining issues). Mark untested instructions as
+  untested
+- Downloads: use `curl -fL`, and record a SHA-256 for any versioned file
+  people are told to install
 
 ---
 
@@ -168,7 +185,7 @@ To add support for other T2 MacBooks:
 
 Use conventional commit format:
 
-```
+```text
 Type: Short description
 
 Longer description if needed.
@@ -178,6 +195,7 @@ Longer description if needed.
 ```
 
 **Types:**
+
 - `Add:` New feature or script
 - `Fix:` Bug fix
 - `Update:` Update existing feature
@@ -186,7 +204,8 @@ Longer description if needed.
 - `Test:` Add or update tests
 
 **Examples:**
-```
+
+```text
 Add: Support for MacBookPro16,1
 
 - Add WiFi firmware for BCM4364

@@ -10,7 +10,7 @@ echo ""
 echo "[System Information]"
 echo "  Model: $(cat /sys/class/dmi/id/product_name 2>/dev/null || echo 'Unknown')"
 echo "  Kernel: $(uname -r)"
-echo "  OS: $(lsb_release -d 2>/dev/null | cut -f2 || echo 'Unknown')"
+echo "  OS: $(sed -n 's/^PRETTY_NAME=//p' /etc/os-release 2>/dev/null | tr -d '"')"
 echo ""
 
 echo "[T2 Kernel Check]"
@@ -24,7 +24,7 @@ fi
 echo ""
 
 echo "[Kernel Modules]"
-echo "  apple-bce:      $(lsmod | grep -q apple_bce && echo '✓ Loaded' || echo '✗ Not loaded')"
+echo "  T2 bridge:      $(lsmod | grep -qE '^(t2bce_vhci|apple_bce) ' && echo '✓ Loaded' || echo '✗ Not loaded (t2bce_vhci or apple_bce)')"
 echo "  brcmfmac (WiFi):$(lsmod | grep -q brcmfmac && echo '✓ Loaded' || echo '✗ Not loaded')"
 echo "  i915 (GPU):     $(lsmod | grep -q i915 && echo '✓ Loaded' || echo '✗ Not loaded')"
 echo ""
@@ -46,7 +46,7 @@ fi
 echo ""
 
 echo "[Touch Bar]"
-if [ -e /dev/input/by-id/*Apple*Touch*Bar* ] 2>/dev/null; then
+if compgen -G "/dev/input/by-id/*Apple*Touch*Bar*" >/dev/null; then
     echo "  ✓ Touch Bar detected"
 else
     echo "  ℹ Touch Bar status unknown (check if visible)"
@@ -62,7 +62,7 @@ fi
 echo ""
 
 echo "[Microphone]"
-MIC_COUNT=$(arecord -l 2>/dev/null | grep -c "Digital Mic" || echo "0")
+MIC_COUNT=$(arecord -l 2>/dev/null | grep -c "Digital Mic" || true)
 if [ "$MIC_COUNT" -gt 0 ]; then
     echo "  ✓ Microphone detected ($MIC_COUNT device(s))"
 else
@@ -78,6 +78,14 @@ elif ip link show | grep -q "wl"; then
     echo "  ✓ WiFi adapter present (not connected)"
 else
     echo "  ✗ WiFi NOT detected"
+fi
+echo ""
+
+echo "[Wi-Fi/Bluetooth firmware]"
+if ls /lib/firmware/brcm/brcmfmac*apple* >/dev/null 2>&1; then
+    echo "  ✓ Apple Wi-Fi firmware present in /lib/firmware/brcm"
+else
+    echo "  ✗ No Apple Wi-Fi firmware in /lib/firmware/brcm (see docs/drivers-and-firmware.md)"
 fi
 echo ""
 
@@ -114,10 +122,10 @@ echo ""
 
 echo "[Kernel Parameters]"
 CMDLINE=$(cat /proc/cmdline)
-echo "  intel_iommu=on:  $(echo $CMDLINE | grep -q 'intel_iommu=on' && echo '✓' || echo '✗')"
-echo "  iommu=pt:        $(echo $CMDLINE | grep -q 'iommu=pt' && echo '✓' || echo '✗')"
-echo "  pm_async=off:    $(echo $CMDLINE | grep -q 'pm_async=off' && echo '✓' || echo '✗')"
-echo "  pcie_ports=compat: $(echo $CMDLINE | grep -q 'pcie_ports=compat' && echo '✓' || echo '✗')"
+echo "  intel_iommu=on:  $(echo "$CMDLINE" | grep -q 'intel_iommu=on' && echo '✓' || echo '✗')"
+echo "  iommu=pt:        $(echo "$CMDLINE" | grep -q 'iommu=pt' && echo '✓' || echo '✗')"
+echo "  pm_async=off:    $(echo "$CMDLINE" | grep -q 'pm_async=off' && echo '✓' || echo '✗')"
+echo "  pcie_ports=compat: $(echo "$CMDLINE" | grep -q 'pcie_ports=compat' && echo '✓' || echo '✗')"
 echo ""
 
 echo "============================================================"
@@ -127,6 +135,6 @@ echo ""
 echo "If any hardware shows as NOT working:"
 echo "  1. Check you rebooted after installation"
 echo "  2. Verify T2 kernel is running: uname -r"
-echo "  3. Run: sudo modprobe apple-bce"
-echo "  4. See: docs/TROUBLESHOOTING.md"
+echo "  3. Run: sudo modprobe t2bce_vhci  (older kernels: apple-bce)"
+echo "  4. See: docs/troubleshooting.md"
 echo ""

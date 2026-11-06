@@ -1,0 +1,518 @@
+#!/bin/bash
+# t2kit - set up Apple T2 MacBooks from a live USB
+#
+#   t2kit capture --from-system [DIR] | --from-tar FILE | --from-pkg FILE
+#       Save Wi-Fi/Bluetooth firmware into this kit folder (once).
+#   t2kit live [--iwd]
+#       Load the saved firmware into the running live session.
+#   t2kit install TARGET [--no-packages] [--touchbar]
+#       Set up an installed system mounted at TARGET (e.g. /mnt) before
+#       rebooting into it. TARGET=/ sets up the running system instead.
+#   t2kit verify
+#       Check the T2 hardware on the running system.
+#
+# Run with bash (USB sticks formatted exFAT keep no execute bit):
+#   sudo bash /path/to/t2kit/t2kit <command>
+#
+# Supported installed systems: Ubuntu and derivatives (apt) and Arch-based
+# systems with a T2 kernel such as CachyOS (pacman). See
+# docs/t2kit.md for what is tested.
+
+set -eo pipefail
+
+KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=t2kit/lib/os.sh
+source "$KIT_DIR/lib/os.sh"
+
+FIRMWARE_DIR="${T2KIT_FIRMWARE_DIR:-$KIT_DIR/firmware}"
+FW_TAR="$FIRMWARE_DIR/firmware.tar"
+T2_REPO_BASE="https://adityagarg8.github.io/t2-ubuntu-repo"
+T2_RELEASE_BASE="https://github.com/AdityaGarg8/t2-ubuntu-repo/releases/download"
+T2_KEYRING="/etc/apt/trusted.gpg.d/t2-ubuntu-repo.gpg"
+# Known-good third-party package, see docs/drivers-and-firmware.md
+KNOWN_PKG="apple-bcm-firmware-14.0-1-any.pkg.tar.zst"
+KNOWN_PKG_SHA256="f2cd47d9e3fb9658f16997b2d9ace3033b57925b8c6ddd86ccc3d07d0c3e9559"
+
+log()  { echo "==> $*"; }
+warn() { echo "WARNING: $*" >&2; }
+die()  { echo "Error: $*" >&2; exit 1; }
+
+need_root() {
+    [ "${T2KIT_ALLOW_NONROOT:-}" = 1 ] && return 0
+    [ "$EUID" -eq 0 ] || die "run as root: sudo bash $0 $*"
+}
+
+# ------------------------------------------------------------------------
+# Seams: tests replace these through T2KIT_* variables
+# ------------------------------------------------------------------------
+
+fetch() {
+    local url="$1" out="$2"
+    if [ -n "${T2KIT_FETCH:-}" ]; then
+        "$T2KIT_FETCH" "$url" "$out"
+    else
+        # -f: fail on HTTP errors instead of saving an error page
+        curl -fL --retry 3 -sS -o "$out" "$url"
+    fi
+}
+
+CHROOT_READY=""
+CHROOT_MOUNTS=()
+
+cleanup_chroot() {
+    local i
+    for (( i=${#CHROOT_MOUNTS[@]}-1; i>=0; i-- )); do
+        umount "${CHROOT_MOUNTS[$i]}" 2>/dev/null || umount -l "${CHROOT_MOUNTS[$i]}" 2>/dev/null || true
+    done
+    CHROOT_MOUNTS=()
+}
+
+# Bind the API filesystems into TARGET once, for systems without arch-chroot.
+setup_chroot() {
+    local d
+    [ -n "$CHROOT_READY" ] && return 0
+    trap cleanup_chroot EXIT
+    for d in dev dev/pts proc sys run; do
+        mountpoint -q "$TARGET/$d" && continue
+        mkdir -p "$TARGET/$d"
+        mount --bind "/$d" "$TARGET/$d"
+        CHROOT_MOUNTS+=("$TARGET/$d")
+    done
+    # Name resolution for apt/pacman. A symlinked resolv.conf points into
+    # /run, which is bound above.
+    if [ -f "$TARGET/etc/resolv.conf" ] && [ ! -L "$TARGET/etc/resolv.conf" ]; then
+        mount --bind /etc/resolv.conf "$TARGET/etc/resolv.conf"
+        CHROOT_MOUNTS+=("$TARGET/etc/resolv.conf")
+    fi
+    CHROOT_READY=1
+}
+
+# Run a command inside the installed system.
+run_in_target() {
+    if [ -n "${T2KIT_CHROOT:-}" ]; then
+        "$T2KIT_CHROOT" "$TARGET" "$@"
+    elif [ "$TARGET" = "/" ]; then
+        "$@"
+    elif command -v arch-chroot >/dev/null 2>&1; then
+        arch-chroot "$TARGET" "$@"
+    else
+        setup_chroot
+        chroot "$TARGET" "$@"
+    fi
+}
+
+target_has() {
+    local cmd="$1" d
+    for d in usr/bin usr/sbin bin sbin; do
+        [ -x "$TARGET/$d/$cmd" ] && return 0
+    done
+    return 1
+}
+
+# ------------------------------------------------------------------------
+# Firmware
+# ------------------------------------------------------------------------
+
+# Reject tarballs with absolute paths or ".." components.
+tar_is_safe() {
+    ! tar -tf "$1" | grep -qE '(^/|(^|/)\.\.(/|$))'
+}
+
+# Write the staged *apple* firmware files to the kit with a checksum.
+save_staged_firmware() {
+    local staging="$1" count
+    count=$(find "$staging" -maxdepth 1 -type f -name '*apple*' | wc -l)
+    find "$staging" -maxdepth 1 -type f -name 'brcmfmac*apple*' | grep -q . \
+        || die "no Apple Wi-Fi firmware (brcmfmac*apple*) found in the source"
+    mkdir -p "$FIRMWARE_DIR"
+    (cd "$staging" && find . -maxdepth 1 -type f -name '*apple*' -printf '%f\n' | sort \
+        | tar -cf "$FW_TAR" -T -)
+    (cd "$FIRMWARE_DIR" && sha256sum firmware.tar > firmware.tar.sha256)
+    log "Saved $count firmware files to $FW_TAR"
+    log "sha256: $(cut -d' ' -f1 "$FW_TAR.sha256")"
+}
+
+cmd_capture() {
+    local mode="${1:-}" src="${2:-}" staging
+    staging=$(mktemp -d)
+
+    case "$mode" in
+        --from-system)
+            src="${src:-/lib/firmware/brcm}"
+            cp "$src"/*apple* "$staging"/ 2>/dev/null \
+                || die "no *apple* firmware in $src. Get it first: docs/drivers-and-firmware.md" ;;
+        --from-tar)
+            [ -f "$src" ] || die "file not found: $src"
+            tar_is_safe "$src" || die "$src contains unsafe paths; not extracting"
+            tar -xf "$src" -C "$staging" --no-same-owner
+            # Accept both a flat tarball (firmware.sh) and one with brcm/ inside
+            find "$staging" -mindepth 2 -type f -name '*apple*' -exec mv -t "$staging" {} + ;;
+        --from-pkg)
+            [ -f "$src" ] || die "file not found: $src"
+            if [ "$(basename "$src")" = "$KNOWN_PKG" ]; then
+                echo "$KNOWN_PKG_SHA256  $src" | sha256sum -c --quiet - \
+                    || die "$src does not match the published SHA-256. Do not use it."
+                log "Checksum OK for $KNOWN_PKG"
+            else
+                warn "$(basename "$src") is not the known package; its checksum cannot be checked"
+            fi
+            tar_is_safe "$src" || die "$src contains unsafe paths; not extracting"
+            tar --zstd -xf "$src" -C "$staging" --no-same-owner usr/lib/firmware/brcm \
+                || die "could not extract usr/lib/firmware/brcm from $src"
+            find "$staging/usr" -type f -name '*apple*' -exec mv -t "$staging" {} + ;;
+        *)
+            die "usage: t2kit capture --from-system [DIR] | --from-tar FILE | --from-pkg FILE" ;;
+    esac
+    save_staged_firmware "$staging"
+    rm -rf "$staging"
+}
+
+kit_firmware_ok() {
+    [ -f "$FW_TAR" ] && [ -f "$FW_TAR.sha256" ] || return 1
+    (cd "$FIRMWARE_DIR" && sha256sum -c --quiet firmware.tar.sha256) \
+        || die "$FW_TAR does not match its checksum; capture it again"
+    tar_is_safe "$FW_TAR" || die "$FW_TAR contains unsafe paths"
+}
+
+install_firmware_to() {
+    local dest="$1"
+    mkdir -p "$dest"
+    tar -xf "$FW_TAR" -C "$dest" --no-same-owner
+}
+
+# ------------------------------------------------------------------------
+# live
+# ------------------------------------------------------------------------
+
+cmd_live() {
+    local use_iwd=""
+    [ "${1:-}" = "--iwd" ] && use_iwd=1
+    need_root live
+    kit_firmware_ok || die "no firmware in the kit. Run: t2kit capture ..."
+
+    install_firmware_to /lib/firmware/brcm
+    log "Firmware copied to /lib/firmware/brcm"
+
+    modprobe -r brcmfmac_wcc 2>/dev/null || true
+    modprobe -r brcmfmac 2>/dev/null || true
+    modprobe brcmfmac 2>/dev/null || warn "could not load brcmfmac (is this a T2 kernel?)"
+    modprobe -r hci_bcm4377 2>/dev/null || true
+    modprobe hci_bcm4377 2>/dev/null || true
+
+    # Arch-based live systems need iwd with this chip (wpa_supplicant >= 2.11)
+    if [ -z "$use_iwd" ] && [ "$(detect_family /etc/os-release 2>/dev/null)" = pacman ]; then
+        use_iwd=1
+    fi
+    if [ -n "$use_iwd" ]; then
+        if command -v iwd >/dev/null 2>&1 || [ -x /usr/lib/iwd/iwd ]; then
+            mkdir -p /etc/NetworkManager/conf.d
+            printf '[device]\nwifi.backend=iwd\n' > /etc/NetworkManager/conf.d/wifi_backend.conf
+            systemctl restart NetworkManager || warn "could not restart NetworkManager"
+            log "NetworkManager switched to the iwd backend"
+        else
+            warn "iwd is not installed in this live session; keeping the current Wi-Fi backend"
+        fi
+    fi
+    log "Done. List networks with: nmcli device wifi list"
+}
+
+# ------------------------------------------------------------------------
+# install
+# ------------------------------------------------------------------------
+
+# Mount /boot and the EFI partition from the target's fstab if the
+# installer left them unmounted.
+ensure_boot_mounts() {
+    local mp
+    [ "$TARGET" = "/" ] && return 0
+    [ -f "$TARGET/etc/fstab" ] || return 0
+    for mp in $(awk '!/^[[:space:]]*#/ && ($2=="/boot" || $2=="/boot/efi" || $2=="/efi") {print $2}' "$TARGET/etc/fstab"); do
+        mountpoint -q "$TARGET$mp" && continue
+        log "Mounting $mp from the target's fstab"
+        if [ -n "${T2KIT_MOUNT:-}" ]; then
+            "$T2KIT_MOUNT" "$TARGET" "$mp"
+        else
+            mount --fstab "$TARGET/etc/fstab" --target-prefix "$TARGET" "$mp" \
+                || die "could not mount $mp. Mount it under $TARGET$mp and rerun."
+        fi
+    done
+}
+
+setup_apt_repo() {
+    local codename list="$TARGET/etc/apt/sources.list.d/t2.list" tmp line
+    codename=$(detect_ubuntu_codename "$OS_RELEASE") || die "no Ubuntu base found in $OS_RELEASE"
+    is_supported_codename "$codename" \
+        || die "Ubuntu base '$codename' has no T2 kernel repo (supported: $T2_SUPPORTED_CODENAMES)"
+    log "Adding T2 apt repos for Ubuntu base: $codename"
+
+    tmp=$(mktemp -d)
+    fetch "$T2_REPO_BASE/KEY.gpg" "$tmp/KEY.gpg"
+    gpg --dearmor < "$tmp/KEY.gpg" > "$tmp/key.gpg" || die "downloaded T2 repo key is not a valid key"
+    mkdir -p "$TARGET/etc/apt/trusted.gpg.d" "$TARGET/etc/apt/sources.list.d"
+    install -m 644 "$tmp/key.gpg" "$TARGET$T2_KEYRING"
+
+    fetch "$T2_REPO_BASE/t2.list" "$tmp/t2.list"
+    grep -q '^deb ' "$tmp/t2.list" || die "downloaded t2.list is not an apt source"
+    line="deb [signed-by=$T2_KEYRING] $T2_RELEASE_BASE/$codename ./"
+    { cat "$tmp/t2.list"; echo "$line"; } > "$list"
+    rm -rf "$tmp"
+
+    run_in_target apt-get update
+}
+
+install_packages() {
+    local kernel
+    kernel=$(newest_t2_capable_kernel "$(target_modules_dir "$TARGET")")
+    case "$FAMILY" in
+        apt)
+            setup_apt_repo
+            if [ -z "$kernel" ]; then
+                log "Installing the T2 kernel (linux-t2-lts)"
+                run_in_target apt-get install -y linux-t2-lts
+            fi
+            [ -n "$TOUCHBAR" ] && run_in_target apt-get install -y tiny-dfr
+            ;;
+        pacman)
+            [ -n "$TOUCHBAR" ] && run_in_target pacman -S --needed --noconfirm tiny-dfr
+            ;;
+    esac
+    return 0
+}
+
+configure_modules() {
+    local modules_dir kernel driver load early gen
+    modules_dir=$(target_modules_dir "$TARGET")
+    kernel=$(newest_t2_capable_kernel "$modules_dir")
+    if [ -z "$kernel" ]; then
+        case "$FAMILY" in
+            apt) die "no T2 kernel in $TARGET. Rerun without --no-packages to install linux-t2-lts." ;;
+            pacman) die "no T2-capable kernel in $TARGET. CachyOS kernels include T2 support; on Arch/EndeavourOS install a T2 kernel first (https://wiki.t2linux.org/distributions/arch/installation/)." ;;
+        esac
+    fi
+    driver=$(bce_driver_for_kernel "$modules_dir/$kernel")
+    log "Newest T2 kernel: $kernel (driver: $driver)"
+    if [ "$driver" = t2bce ]; then
+        load="t2bce_vhci"; early="t2bce_dma t2bce_core t2bce_vhci"
+    else
+        load="apple-bce"; early="apple-bce"
+    fi
+
+    mkdir -p "$TARGET/etc/modules-load.d"
+    rm -f "$TARGET/etc/modules-load.d/apple-bce.conf"
+    printf '# T2 bridge driver (t2kit)\n%s\n' "$load" > "$TARGET/etc/modules-load.d/t2.conf"
+
+    # Early loading, for the internal keyboard at a disk-encryption prompt
+    if target_has update-initramfs; then
+        gen=initramfs-tools
+        # shellcheck disable=SC2086
+        initramfs_tools_set_modules "$TARGET/etc/initramfs-tools/modules" $early
+    elif target_has mkinitcpio; then
+        gen=mkinitcpio
+        write_mkinitcpio_dropin "$TARGET/etc/mkinitcpio.conf.d/99-t2kit.conf"
+    elif target_has dracut; then
+        gen=dracut
+        mkdir -p "$TARGET/etc/dracut.conf.d"
+        echo "force_drivers+=\" $early \"" > "$TARGET/etc/dracut.conf.d/t2linux-modules.conf"
+    else
+        gen=""
+        warn "no known initramfs generator; the keyboard may not work at a LUKS prompt"
+    fi
+    INITRAMFS_GEN="$gen"
+}
+
+# mkinitcpio reads one config for every kernel, but kernels differ in
+# which T2 driver they ship (CachyOS 7.2 moved from apple-bce to t2bce).
+# This drop-in picks the right modules per kernel and drops apple-bce
+# where it doesn't exist, e.g. when chwd's config still lists it.
+write_mkinitcpio_dropin() {
+    mkdir -p "$(dirname "$1")"
+    cat > "$1" << 'EOF'
+# Added by t2kit: load the T2 driver this kernel actually ships.
+_t2kit_mods="/usr/lib/modules/${KERNELVERSION}"
+if [ -n "${KERNELVERSION}" ] && [ -d "$_t2kit_mods" ]; then
+    _t2kit_keep=()
+    for _t2kit_m in "${MODULES[@]}"; do
+        case "$_t2kit_m" in apple-bce|apple_bce|t2bce_*) ;; *) _t2kit_keep+=("$_t2kit_m") ;; esac
+    done
+    if find "$_t2kit_mods" -name 't2bce_vhci.ko*' -print -quit | grep -q .; then
+        MODULES=("${_t2kit_keep[@]}" t2bce_dma t2bce_core t2bce_vhci)
+    elif find "$_t2kit_mods" -name 'apple[-_]bce.ko*' -print -quit | grep -q .; then
+        MODULES=("${_t2kit_keep[@]}" apple-bce)
+    else
+        MODULES=("${_t2kit_keep[@]}")
+    fi
+    unset _t2kit_keep _t2kit_m
+fi
+unset _t2kit_mods
+EOF
+}
+
+configure_kernel_params() {
+    local handled="" f
+    # shellcheck disable=SC2086
+    if [ -f "$TARGET/etc/default/grub" ]; then
+        grub_add_params "$TARGET/etc/default/grub" $T2_KERNEL_PARAMS
+        handled="$handled grub"
+    fi
+    if [ -f "$TARGET/etc/kernel/cmdline" ]; then
+        # shellcheck disable=SC2086
+        cmdline_add_params "$(cat "$TARGET/etc/kernel/cmdline")" $T2_KERNEL_PARAMS > "$TARGET/etc/kernel/cmdline.t2kit"
+        mv "$TARGET/etc/kernel/cmdline.t2kit" "$TARGET/etc/kernel/cmdline"
+        handled="$handled kernel-cmdline"
+    fi
+    if [ -f "$TARGET/etc/sdboot-manage.conf" ] && grep -q '^LINUX_OPTIONS=' "$TARGET/etc/sdboot-manage.conf"; then
+        edit_quoted_var "$TARGET/etc/sdboot-manage.conf" LINUX_OPTIONS
+        handled="$handled sdboot-manage"
+    fi
+    for f in "$TARGET"/boot/loader/entries/*.conf "$TARGET"/efi/loader/entries/*.conf "$TARGET"/boot/efi/loader/entries/*.conf; do
+        [ -f "$f" ] || continue
+        edit_options_line "$f"
+        handled="$handled systemd-boot"
+    done
+    if [ -f "$TARGET/etc/default/limine" ]; then
+        if grep -q 'intel_iommu=on' "$TARGET/etc/default/limine"; then
+            handled="$handled limine"
+        else
+            warn "Limine: add '$T2_KERNEL_PARAMS' to KERNEL_CMDLINE in /etc/default/limine yourself"
+        fi
+    fi
+    if [ -z "$handled" ]; then
+        warn "no supported bootloader config found; add '$T2_KERNEL_PARAMS' to the kernel command line yourself"
+    else
+        log "Kernel parameters set in:$(echo "$handled" | tr ' ' '\n' | sort -u | tr '\n' ' ')"
+    fi
+}
+
+edit_quoted_var() {
+    local file="$1" var="$2" current new
+    current=$(sed -n "s/^$var=//p" "$file" | head -1 | sed "s/^[\"']//; s/[\"']\$//")
+    # shellcheck disable=SC2086
+    new=$(cmdline_add_params "$current" $T2_KERNEL_PARAMS)
+    sed -i "s|^$var=.*|$var=\"$new\"|" "$file"
+}
+
+edit_options_line() {
+    local file="$1" current new
+    grep -q '^options' "$file" || return 0
+    current=$(sed -n 's/^options[[:space:]]*//p' "$file" | head -1)
+    # shellcheck disable=SC2086
+    new=$(cmdline_add_params "$current" $T2_KERNEL_PARAMS)
+    sed -i "s|^options.*|options $new|" "$file"
+}
+
+regenerate_boot_files() {
+    case "$INITRAMFS_GEN" in
+        initramfs-tools) run_in_target update-initramfs -u -k all ;;
+        mkinitcpio)      run_in_target mkinitcpio -P ;;
+        dracut)          run_in_target dracut --regenerate-all --force ;;
+    esac
+    if [ -f "$TARGET/etc/default/grub" ]; then
+        if target_has update-grub; then
+            run_in_target update-grub
+        elif target_has grub-mkconfig && [ -f "$TARGET/boot/grub/grub.cfg" ]; then
+            run_in_target grub-mkconfig -o /boot/grub/grub.cfg
+        fi
+    fi
+    if [ -f "$TARGET/etc/sdboot-manage.conf" ] && target_has sdboot-manage; then
+        run_in_target sdboot-manage gen
+    fi
+    return 0
+}
+
+cmd_install() {
+    local arg live_fw=""
+    TARGET="" NO_PACKAGES="" TOUCHBAR=""
+    for arg in "$@"; do
+        case "$arg" in
+            --no-packages) NO_PACKAGES=1 ;;
+            --touchbar)    TOUCHBAR=1 ;;
+            -*)            die "unknown option: $arg" ;;
+            *)             TARGET="$arg" ;;
+        esac
+    done
+    [ -n "$TARGET" ] || die "usage: t2kit install TARGET [--no-packages] [--touchbar]"
+    TARGET="${TARGET%/}"; TARGET="${TARGET:-/}"
+    need_root install
+    [ -d "$TARGET" ] || die "$TARGET is not a directory"
+
+    OS_RELEASE="$TARGET/etc/os-release"
+    [ -f "$OS_RELEASE" ] || OS_RELEASE="$TARGET/usr/lib/os-release"
+    [ -f "$OS_RELEASE" ] || die "$TARGET doesn't look like an installed system (no os-release). Mount its root partition there first."
+    FAMILY=$(detect_family "$OS_RELEASE") \
+        || die "$(os_release_value "$OS_RELEASE" PRETTY_NAME) is not supported by t2kit (Ubuntu-based or Arch-based only). See docs/distros/other.md"
+    log "Target: $TARGET ($(os_release_value "$OS_RELEASE" PRETTY_NAME), $FAMILY)"
+
+    ensure_boot_mounts
+
+    # 1. Firmware: from the kit, or from this live session if loaded there
+    if ! kit_firmware_ok; then
+        if ls /lib/firmware/brcm/brcmfmac*apple* >/dev/null 2>&1 && [ "$TARGET" != "/" ]; then
+            log "No firmware in the kit; using the firmware loaded in this live session"
+            FIRMWARE_DIR=$(mktemp -d); FW_TAR="$FIRMWARE_DIR/firmware.tar"; live_fw=1
+            cmd_capture --from-system /lib/firmware/brcm
+        fi
+    fi
+    if [ -f "$FW_TAR" ]; then
+        install_firmware_to "$TARGET/usr/lib/firmware/brcm"
+        log "Firmware installed to $TARGET/usr/lib/firmware/brcm"
+        [ -n "$live_fw" ] && rm -rf "$FIRMWARE_DIR"
+    else
+        warn "no firmware available; Wi-Fi/Bluetooth won't work until you add it (docs/drivers-and-firmware.md)"
+    fi
+
+    # 2. T2 package sources, kernel, optional Touch Bar daemon
+    if [ -z "$NO_PACKAGES" ]; then
+        install_packages
+    else
+        log "Skipping package sources and installs (--no-packages)"
+    fi
+
+    # 3. Driver at boot and in the initramfs, 4. kernel parameters
+    configure_modules
+    configure_kernel_params
+
+    # 5. Rebuild initramfs and bootloader config
+    regenerate_boot_files
+
+    echo ""
+    log "Done. Reboot into the installed system, then run: sudo bash $0 verify"
+}
+
+# ------------------------------------------------------------------------
+# verify
+# ------------------------------------------------------------------------
+
+cmd_verify() {
+    local ok="✓" bad="✗" p
+    echo "Model:  $(cat /sys/class/dmi/id/product_name 2>/dev/null || echo unknown)"
+    echo "OS:     $(os_release_value /etc/os-release PRETTY_NAME)"
+    echo "Kernel: $(uname -r)"
+    echo ""
+    if lsmod | grep -qE '^(t2bce_vhci|apple_bce) '; then echo "$ok T2 bridge driver loaded"; else echo "$bad T2 bridge driver not loaded (keyboard/trackpad)"; fi
+    if ls /lib/firmware/brcm/brcmfmac*apple* >/dev/null 2>&1; then echo "$ok Apple Wi-Fi firmware installed"; else echo "$bad Apple Wi-Fi firmware missing"; fi
+    if ip -o link 2>/dev/null | grep -q ': wl'; then echo "$ok Wi-Fi interface present"; else echo "$bad no Wi-Fi interface"; fi
+    if [ -d /sys/class/bluetooth/hci0 ]; then echo "$ok Bluetooth controller present"; else echo "$bad no Bluetooth controller"; fi
+    for p in $T2_KERNEL_PARAMS; do
+        if grep -qw -- "$p" /proc/cmdline; then echo "$ok kernel parameter $p"; else echo "$bad kernel parameter $p missing"; fi
+    done
+    if arecord -l 2>/dev/null | grep -qi 'apple\|t2'; then echo "$ok T2 audio device present"; else echo "ℹ T2 audio device not listed by arecord"; fi
+    echo ""
+    echo "Also check by hand: keyboard, trackpad, Touch Bar, speakers, microphone, camera."
+}
+
+# ------------------------------------------------------------------------
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+    case "$cmd" in
+        capture) cmd_capture "$@" ;;
+        live)    cmd_live "$@" ;;
+        install) cmd_install "$@" ;;
+        verify)  cmd_verify "$@" ;;
+        *)       sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    esac
+}
+
+# Allow tests to source this file without running main
+[ "${BASH_SOURCE[0]}" = "$0" ] && main "$@"

@@ -1,27 +1,37 @@
 #!/bin/bash
-# MacBookPro15,4 T2 Complete Setup - Master Installer
-# Automated installation of all drivers and firmware
-# For Zorin OS 17 / Ubuntu 24.04
+# T2 MacBook Setup - Master Installer
+# Automated installation of drivers and firmware
+# For Zorin OS / Ubuntu and Ubuntu derivatives only (apt + GRUB).
+# Other distros: see docs/distros/
 
 set -e
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS_DIR="$REPO_DIR/scripts"
+# shellcheck source=scripts/lib_os.sh
+source "$SCRIPTS_DIR/lib_os.sh"
+
+if ! CODENAME=$(detect_ubuntu_codename) || ! is_supported_codename "$CODENAME"; then
+    echo "Error: this installer supports Zorin OS / Ubuntu based on: $T2_SUPPORTED_CODENAMES"
+    echo "Detected: ${CODENAME:-not Ubuntu-based}"
+    echo "For other distros see docs/distros/ (do not run these apt/GRUB scripts there)."
+    exit 1
+fi
 
 echo "============================================================"
-echo "  MacBookPro15,4 Complete Setup for Zorin OS 17"
+echo "  T2 MacBook Setup for Zorin OS / Ubuntu ($CODENAME)"
 echo "============================================================"
 echo ""
 echo "This will install ALL drivers and firmware for your T2 MacBook:"
 echo ""
-echo "  ✓ WiFi and Bluetooth (BCM4377b3)"
+echo "  ✓ WiFi and Bluetooth firmware (extracted from macOS or Apple recovery image)"
 echo "  ✓ T2 Kernel (trackpad, Touch Bar, camera support)"
-echo "  ✓ Apple BCE Driver (keyboard, trackpad)"
+echo "  ✓ T2 bridge driver loaded at boot (keyboard, trackpad)"
 echo "  ✓ T2 Audio (microphone, speakers)"
 echo "  ✓ Kernel parameters (IOMMU, PCIe)"
 echo ""
 echo "REQUIREMENTS:"
-echo "  - Fresh Zorin OS 17 installation"
+echo "  - Fresh Zorin OS / Ubuntu installation"
 echo "  - External USB keyboard and mouse connected"
 echo "  - Internet connection (Ethernet or USB WiFi dongle)"
 echo ""
@@ -88,14 +98,14 @@ fi
 
 echo ""
 echo "============================================================"
-echo "STEP 3/5: Installing Apple BCE Driver"
+echo "STEP 3/5: Configuring T2 Bridge Driver"
 echo "============================================================"
 echo ""
 
-if [ -f "$SCRIPTS_DIR/03_install_apple_bce.sh" ]; then
-    bash "$SCRIPTS_DIR/03_install_apple_bce.sh"
+if [ -f "$SCRIPTS_DIR/03_configure_t2_modules.sh" ]; then
+    bash "$SCRIPTS_DIR/03_configure_t2_modules.sh"
 else
-    echo "Error: Apple BCE installation script not found!"
+    echo "Error: T2 module configuration script not found!"
     exit 1
 fi
 
@@ -168,6 +178,9 @@ echo "   Settings → Sound → Input → Test"
 echo ""
 echo "7. Test camera:"
 echo "   cheese (install with: sudo apt install cheese)"
+echo ""
+echo "8. Only once everything above works, remove the fallback stock kernel:"
+echo "   sudo bash $SCRIPTS_DIR/06_remove_stock_kernel.sh"
 echo ""
 echo "============================================================"
 echo ""

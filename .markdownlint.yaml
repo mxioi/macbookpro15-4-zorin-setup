@@ -1,0 +1,2 @@
+# Prose-heavy docs: long lines (URLs, tables, commands) are fine.
+MD013: false
